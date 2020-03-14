@@ -66,7 +66,19 @@ class I18n
             DB::connect($this->config)->table($this->store)->truncate(true); //截断清空
             DB::connect($this->config)->table($this->store)->insertAll($i18nData);
         } elseif ($db instanceof Pgsql) {
-
+            $db->query("CREATE TABLE IF NOT EXISTS `{$this->store}`(
+                        `unique_key` text NOT NULL DEFAULT '',
+                        `source`     text NOT NULL DEFAULT 'new',
+                        `zh_cn`      text NOT NULL DEFAULT '',
+                        `zh_hk`      text NOT NULL DEFAULT '',
+                        `zh_tw`      text NOT NULL DEFAULT '',
+                        `en_us`      text NOT NULL DEFAULT '',
+                        `ja_jp`      text NOT NULL DEFAULT '',
+                        `ko_kr`      text NOT NULL DEFAULT '',
+                        PRIMARY KEY (`unique_key`)
+                    ) ENGINE = INNODB COMMENT 'i18n by yonna';");
+            DB::connect($this->config)->schemas('public')->table($this->store)->truncate(true); //截断清空
+            DB::connect($this->config)->schemas('public')->table($this->store)->insertAll($i18nData);
         } else {
             throw new \Exception('Set Database for Support Driver.');
         }
