@@ -86,9 +86,9 @@ class I18n
             if ($db instanceof Mongo) {
                 $res = $db->collection("{$this->store}")->multi();
             } elseif ($db instanceof Mysql) {
-                $res = $db->table('i18n')->multi();
+                $res = $db->table($this->store)->multi();
             } elseif ($db instanceof Pgsql) {
-                $res = $db->schemas('public')->table('i18n')->multi();
+                $res = $db->schemas('public')->table($this->store)->multi();
             } else {
                 throw new \Exception('Set Database for Support Driver.');
             }
