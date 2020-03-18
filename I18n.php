@@ -6,9 +6,19 @@ use Yonna\Database\DB;
 use Yonna\Database\Driver\Mongo;
 use Yonna\Database\Driver\Mysql;
 use Yonna\Database\Driver\Pgsql;
+use Yonna\Database\Driver\Redis;
 
 class I18n
 {
+
+    const ALLOW_LANG = [
+        'zh_cn',
+        'zh_hk',
+        'zh_tw',
+        'en_us',
+        'ja_jp',
+        'ko_kr',
+    ];
 
     private $store = 'yonna_i18n';
     private $config = null;
@@ -28,6 +38,66 @@ class I18n
             return;
         }
         $this->config = Config::getDatabase();
+    }
+
+    /**
+     * 自动翻译机
+     * 最大 9 QTS
+     * 暂可请求百度通用翻译API
+     *
+     * @return bool
+     */
+    private function auto()
+    {
+        if (!Config::getAuto()) {
+            trigger_error('Set Config for Auto Translate.');
+            return false;
+        }
+        if (!Config::getBaidu()) {
+            trigger_error('Set Config for BaiduApi.');
+            return false;
+        }
+        $rds = DB::redis(Config::getAuto());
+        if (($rds instanceof Redis) === false) {
+            trigger_error('Auto Translate Should use Redis Database Driver.');
+            return false;
+        }
+        $rk = $this->store . 'QTS';
+        if ((int)$rds->get($rk) >= 9) {
+            return true;
+        }
+        try {
+            $db = DB::connect($this->config);
+            if ($db instanceof Mongo) {
+                $one = $db->collection("{$this->store}")->one();
+            } elseif ($db instanceof Mysql) {
+                $table = $db->table($this->store)->fetchQuery();
+                $one = $table->or(
+                    function () use ($table) {
+                        foreach (self::ALLOW_LANG as $v) {
+                            $table->equalTo($v, '');
+                        }
+                        $table->and(
+                            function () use ($table) {
+                                foreach (self::ALLOW_LANG as $v) {
+                                    $table->equalTo($v, '');
+                                }
+                            });
+                    })
+                    ->equalTo('zh_cn', 'x')
+                    ->one();
+                var_dump($one);
+                exit();
+            } elseif ($db instanceof Pgsql) {
+                $one = $db->schemas('public')->table($this->store)->one();
+            } else {
+                throw new \Exception('Set Database for Support Driver.');
+            }
+        } catch (\Throwable $e) {
+            exit($e->getMessage());
+        }
+        // $rds->incr($rk);
+        return true;
     }
 
     /**
@@ -107,7 +177,44 @@ class I18n
         } catch (\Throwable $e) {
             // nothing
         }
+        $this->auto();
         return $res;
+    }
+
+    /**
+     * 设置一个i18n数据
+     * 如果有则更新，没有则添加
+     * @param $uniqueKey
+     * @param array $data
+     */
+    public function set($uniqueKey, $data = [])
+    {
+        if (empty($uniqueKey)) {
+            return;
+        }
+        $uniqueKey = strtoupper($uniqueKey);
+        $data = array_filter($data);
+        try {
+            $db = DB::connect($this->config);
+            if ($db instanceof Mongo) {
+                $res = $db->collection("{$this->store}")->getCollection();
+            } elseif ($db instanceof Mysql) {
+                $res = $db->table($this->store)->equalTo('unique_key', $uniqueKey)->one();
+                if (!$res) {
+                    $data['unique_key'] = $uniqueKey;
+                    $db->table($this->store)->insert($data);
+                } else {
+                    $db->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
+                }
+            } elseif ($db instanceof Pgsql) {
+                $res = $db->schemas('public')->table($this->store)->one();
+            } else {
+                throw new \Exception('Set Database for Support Driver.');
+            }
+        } catch (\Throwable $e) {
+            // nothing
+        }
+        $this->auto();
     }
 
 }
