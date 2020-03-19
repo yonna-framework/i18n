@@ -65,7 +65,8 @@ class I18n
         $bdLimit = count(Config::getBaidu());
 
         $rk = $this->store . 'QTS';
-        if ((int)$rds->get($rk) >= $bdLimit * 10) {
+        if ((int)$rds->gcr($rk) >= $bdLimit * 15) {
+            $rds->expire($rk, 60);
             return;
         }
         $one = null;
@@ -93,21 +94,39 @@ class I18n
                 }
                 if (empty($one[$this->store . '_' . $v])) {
                     $bi++;
-                    if ($bi > 1/*$bdLimit * 3*/) {
-                        //baidu QTS
+                    if ($bi > $bdLimit * 5) {
                         break;
                     }
                     $rds->incr($rk);
-                    BaiduApi::translate(
-                        $one[$this->store . '_unique_key'],
-                        $v,
-                        function (string $from, string $to, string $res) use ($db, $rds, $rk) {
-                            $db->table($this->store)->equalTo('unique_key', $from)->update([
-                                $to => $res,
-                            ]);
-                            $rds->decr($rk);
-                        }
-                    );
+                    $uk = $one[$this->store . '_unique_key'];
+                    $q = $uk;
+                    $from = 'auto';
+                    // 有英语用英语，无需怀疑
+                    if (!empty($one[$this->store . '_en_us'])) {
+                        $q = $one[$this->store . '_en_us'];
+                        $from = 'en_us';
+                    }
+                    // 同胞的文字，汉字优先
+                    if (!empty($one[$this->store . '_zh_cn']) && in_array($v, ['zh_hk', 'zh_tw'])) {
+                        $q = $one[$this->store . '_zh_cn'];
+                        $from = 'zh_cn';
+                    }
+                    try {
+                        BaiduApi::translate(
+                            $q,
+                            $from,
+                            $v,
+                            function (string $to, string $res) use ($db, $rds, $rk, $uk) {
+                                $db->table($this->store)->equalTo('unique_key', $uk)->update([
+                                    $to => $res,
+                                ]);
+                                $rds->decr($rk);
+                            }
+                        );
+                    } catch (\Throwable $e) {
+                        $rds->decr($rk);
+                        Exception::origin($e);
+                    }
                 }
             }
         }

@@ -10,10 +10,13 @@ use Psr\Http\Message\ResponseInterface;
 use Yonna\Database\DB;
 use Yonna\Database\Driver\Redis;
 use Yonna\Foundation\Str;
+use Yonna\Log\Log;
 use Yonna\Throwable\Exception;
 
 class BaiduApi
 {
+
+    const KEY = 'baidu_api';
 
     /**
      * 这里只收录少量
@@ -69,7 +72,7 @@ class BaiduApi
         }
         $appid = $config[0];
         $salt = Str::randomNum(16);
-        $sign = md5($appid . $query . $salt . $config[1]);
+        $sign = md5($appid . urlencode($query) . $salt . $config[1]);
         return [
             'appid' => $appid,
             'salt' => $salt,
@@ -80,14 +83,16 @@ class BaiduApi
     /**
      * 通用翻译API
      * @param $query
+     * @param $from
      * @param $to
      * @param Closure $call
-     * @throws null
+     * @throws Exception\DatabaseException
+     * @throws Exception\ParamsException
      */
-    public static function translate($query, $to, Closure $call)
+    public static function translate($query, $from, $to, Closure $call)
     {
-        if (!$query || !$to) {
-            Exception::params('BaiduApi: query & to');
+        if (!$query || !$from || !$to) {
+            Exception::params('BaiduApi: query & from & to');
         }
         if (!Config::getBaidu()) {
             Exception::params('BaiduApi: Please set config');
@@ -101,40 +106,49 @@ class BaiduApi
             Exception::params('Auto Translate Should use Redis Database Driver.');
             return;
         }
-        $rk = 'BAIDUAPI:' . $query . '_' . self::LANG[$to];
+        $rk = self::KEY . ":{$query}_" . self::LANG[$to];
         $cache = $rds->get($rk);
         if ($cache) {
-            $call($query, $to, current($cache['trans_result'])['dst']);
+            $call($to, urldecode($cache['trans_result'][0]['dst']));
             return;
         }
-        $queryString = http_build_query([
-            'q' => urlencode($query), // 请求翻译query UTF-8编码
-            'from' => 'auto', // 翻译源语言 语言列表(可设置为auto)
-            'to' => self::LANG[$to],// 译文语言 语言列表(不可设置为auto)
-            'appid' => $certificate['appid'],// APP ID 可在管理控制台查看
-            'salt' => $certificate['salt'],// 随机数
-            'sign' => $certificate['sign'],// 签名 appid+q+salt+密钥 的MD5值
-        ]);
-        $request = new Request('GET', 'http://api.fanyi.baidu.com/api/trans/vip/translate?' . $queryString);
-        $promise = self::client()->sendAsync($request, ['timeout' => 5])->then(
-            function (ResponseInterface $response) use ($rds, $rk, $call, $query, $to) {
-                if ($response->getStatusCode() === 200) {
-                    $res = $response->getBody()->__tostring();
-                    $res = json_decode($res, true);
-                    if (!empty($res['error_code'])) {
-                        Exception::throw("BaiduApi: {$res['error_msg']} " . self::ERRORS[$res['error_code']] ?? '');
+        try {
+            $queryString = http_build_query([
+                'q' => urlencode($query), // 请求翻译query UTF-8编码
+                'from' => self::LANG[$from] ?? $from, // 翻译源语言 语言列表(可设置为auto)
+                'to' => self::LANG[$to],// 译文语言 语言列表(不可设置为auto)
+                'appid' => $certificate['appid'],// APP ID 可在管理控制台查看
+                'salt' => $certificate['salt'],// 随机数
+                'sign' => $certificate['sign'],// 签名 appid+q+salt+密钥 的MD5值
+            ]);
+            $request = new Request('GET', 'http://api.fanyi.baidu.com/api/trans/vip/translate?' . $queryString);
+            $promise = self::client()->sendAsync($request, ['timeout' => 5])->then(
+                function (ResponseInterface $response) use ($rds, $rk, $call, $query, $to) {
+                    if ($response->getStatusCode() === 200) {
+                        $res = $response->getBody()->__tostring();
+                        $res = json_decode($res, true);
+                        if (!empty($res['error_code'])) {
+                            Log::file()->error([
+                                'msg' => "{$res['error_msg']} " . self::ERRORS[$res['error_code']] ?? ''
+                            ], self::KEY);
+                        } else {
+                            $rds->set($rk, $res, 10);
+                            $call($to, urldecode($res['trans_result'][0]['dst']));
+                        }
+                    } else {
+                        Log::file()->error(['msg' => $response->getReasonPhrase()], self::KEY);
                     }
-                    $rds->set($rk, $res, 60);
-                    $call($query, $to, current($res['trans_result'])['dst']);
-                } else {
-                    Exception::throw($response->getReasonPhrase());
+                },
+                function (RequestException $e) {
+                    Log::file()->error([
+                        'msg' => '[' . $e->getRequest()->getMethod() . ']' . $e->getMessage()
+                    ], self::KEY);
                 }
-            },
-            function (RequestException $e) {
-                Exp('BaiduApi: [' . $e->getRequest()->getMethod() . ']' . $e->getMessage());
-            }
-        );
-        $promise->wait();
+            );
+            // $promise->wait();
+        } catch (\Throwable $e) {
+            Log::file()->throwable($e, self::KEY);
+        }
     }
 
 }

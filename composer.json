@@ -1,8 +1,17 @@
 {
-  "name": "yonna/i18n",
+  "authors": [
+    {
+      "email": "mzyhaohaoren@qq.com",
+      "homepage": "https://www.hunzsig.org",
+      "name": "hunzsig"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Yonna\\I18n\\": ""
+    }
+  },
   "description": "Yonna 国际化",
-  "license": "MIT",
-  "type": "library",
   "keywords": [
     "php",
     "yonna",
@@ -10,21 +19,13 @@
     "i18n",
     "internationalization"
   ],
+  "license": "MIT",
+  "name": "yonna/i18n",
   "require": {
-    "yonna/foundation": "@dev",
+    "guzzlehttp/guzzle": "^6.5",
     "yonna/database": "@dev",
-    "guzzlehttp/guzzle": "^6.5"
+    "yonna/foundation": "@dev",
+    "yonna/log": "@dev"
   },
-  "autoload": {
-    "psr-4": {
-      "Yonna\\I18n\\": ""
-    }
-  },
-  "authors": [
-    {
-      "name": "hunzsig",
-      "email": "mzyhaohaoren@qq.com",
-      "homepage": "https://www.hunzsig.org"
-    }
-  ]
+  "type": "library"
 }
