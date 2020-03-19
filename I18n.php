@@ -7,6 +7,7 @@ use Yonna\Database\Driver\Mongo;
 use Yonna\Database\Driver\Mysql;
 use Yonna\Database\Driver\Pgsql;
 use Yonna\Database\Driver\Redis;
+use Yonna\Throwable\Exception;
 
 class I18n
 {
@@ -46,6 +47,7 @@ class I18n
      * 暂可请求百度通用翻译API
      *
      * @return bool
+     * @throws Exception\DatabaseException
      */
     private function auto()
     {
@@ -66,35 +68,31 @@ class I18n
         if ((int)$rds->get($rk) >= 9) {
             return true;
         }
-        try {
-            $db = DB::connect($this->config);
-            if ($db instanceof Mongo) {
-                $one = $db->collection("{$this->store}")->one();
-            } elseif ($db instanceof Mysql) {
-                $table = $db->table($this->store)->fetchQuery();
-                $one = $table->or(
-                    function () use ($table) {
-                        foreach (self::ALLOW_LANG as $v) {
-                            $table->equalTo($v, '');
-                        }
-                        $table->and(
-                            function () use ($table) {
-                                foreach (self::ALLOW_LANG as $v) {
-                                    $table->equalTo($v, '');
-                                }
-                            });
-                    })
-                    ->equalTo('zh_cn', 'x')
-                    ->one();
-                var_dump($one);
-                exit();
-            } elseif ($db instanceof Pgsql) {
-                $one = $db->schemas('public')->table($this->store)->one();
-            } else {
-                throw new \Exception('Set Database for Support Driver.');
-            }
-        } catch (\Throwable $e) {
-            exit($e->getMessage());
+        $db = DB::connect($this->config);
+        if ($db instanceof Mongo) {
+            $one = $db->collection("{$this->store}")->one();
+        } elseif ($db instanceof Mysql) {
+            $table = $db->table($this->store)->fetchQuery();
+            $one = $table->or(
+                function () use ($table) {
+                    foreach (self::ALLOW_LANG as $v) {
+                        $table->equalTo($v, '');
+                    }
+                    $table->and(
+                        function () use ($table) {
+                            foreach (self::ALLOW_LANG as $v) {
+                                $table->equalTo($v, '');
+                            }
+                        });
+                })
+                ->equalTo('zh_cn', 'x')
+                ->one();
+            var_dump($one);
+            exit();
+        } elseif ($db instanceof Pgsql) {
+            $one = $db->schemas('public')->table($this->store)->one();
+        } else {
+            Exception::database('Set Database for Support Driver.');
         }
         // $rds->incr($rk);
         return true;
@@ -103,7 +101,7 @@ class I18n
     /**
      * 初始化数据
      * @return bool
-     * @throws null
+     * @throws Exception\DatabaseException
      */
     public function init()
     {
@@ -150,7 +148,7 @@ class I18n
             DB::connect($this->config)->schemas('public')->table($this->store)->truncate(true); //截断清空
             DB::connect($this->config)->schemas('public')->table($this->store)->insertAll($i18nData);
         } else {
-            throw new \Exception('Set Database for Support Driver.');
+            Exception::database('Set Database for Support Driver.');
         }
         return true;
     }
@@ -158,24 +156,21 @@ class I18n
     /**
      * 获得i18n数据
      * @return array
-     * @throws null
+     * @throws Exception
+     * @throws Exception\DatabaseException
      */
     public function get()
     {
         $res = [];
-        try {
-            $db = DB::connect($this->config);
-            if ($db instanceof Mongo) {
-                $res = $db->collection("{$this->store}")->multi();
-            } elseif ($db instanceof Mysql) {
-                $res = $db->table($this->store)->multi();
-            } elseif ($db instanceof Pgsql) {
-                $res = $db->schemas('public')->table($this->store)->multi();
-            } else {
-                throw new \Exception('Set Database for Support Driver.');
-            }
-        } catch (\Throwable $e) {
-            // nothing
+        $db = DB::connect($this->config);
+        if ($db instanceof Mongo) {
+            $res = $db->collection("{$this->store}")->multi();
+        } elseif ($db instanceof Mysql) {
+            $res = $db->table($this->store)->multi();
+        } elseif ($db instanceof Pgsql) {
+            $res = $db->schemas('public')->table($this->store)->multi();
+        } else {
+            Exception::database('Set Database for Support Driver.');
         }
         $this->auto();
         return $res;
@@ -186,6 +181,7 @@ class I18n
      * 如果有则更新，没有则添加
      * @param $uniqueKey
      * @param array $data
+     * @throws Exception\DatabaseException
      */
     public function set($uniqueKey, $data = [])
     {
@@ -194,25 +190,33 @@ class I18n
         }
         $uniqueKey = strtoupper($uniqueKey);
         $data = array_filter($data);
-        try {
-            $db = DB::connect($this->config);
-            if ($db instanceof Mongo) {
-                $res = $db->collection("{$this->store}")->getCollection();
-            } elseif ($db instanceof Mysql) {
-                $res = $db->table($this->store)->equalTo('unique_key', $uniqueKey)->one();
-                if (!$res) {
-                    $data['unique_key'] = $uniqueKey;
-                    $db->table($this->store)->insert($data);
-                } else {
-                    $db->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
-                }
-            } elseif ($db instanceof Pgsql) {
-                $res = $db->schemas('public')->table($this->store)->one();
+        $db = DB::connect($this->config);
+        if ($db instanceof Mongo) {
+            $res = $db->collection("{$this->store}")->getCollection();
+            if (!$res) {
+                $data['unique_key'] = $uniqueKey;
+                $db->collection("{$this->store}")->insert($data);
             } else {
-                throw new \Exception('Set Database for Support Driver.');
+                $db->collection("{$this->store}")->equalTo('unique_key', $uniqueKey)->update($data);
             }
-        } catch (\Throwable $e) {
-            // nothing
+        } elseif ($db instanceof Mysql) {
+            $res = $db->table($this->store)->equalTo('unique_key', $uniqueKey)->one();
+            if (!$res) {
+                $data['unique_key'] = $uniqueKey;
+                $db->table($this->store)->insert($data);
+            } else {
+                $db->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
+            }
+        } elseif ($db instanceof Pgsql) {
+            $res = $db->schemas('public')->table($this->store)->one();
+            if (!$res) {
+                $data['unique_key'] = $uniqueKey;
+                $db->schemas('public')->table($this->store)->insert($data);
+            } else {
+                $db->schemas('public')->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
+            }
+        } else {
+            Exception::database('Set Database for Support Driver.');
         }
         $this->auto();
     }
