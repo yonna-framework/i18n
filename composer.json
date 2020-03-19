@@ -12,7 +12,8 @@
   ],
   "require": {
     "yonna/foundation": "@dev",
-    "yonna/database": "@dev"
+    "yonna/database": "@dev",
+    "guzzlehttp/guzzle": "^6.5"
   },
   "autoload": {
     "psr-4": {

@@ -5,6 +5,7 @@ namespace Yonna\I18n;
 use Yonna\Database\DB;
 use Yonna\Database\Driver\Mongo;
 use Yonna\Database\Driver\Mysql;
+use Yonna\Database\Driver\Pdo\Where;
 use Yonna\Database\Driver\Pgsql;
 use Yonna\Database\Driver\Redis;
 use Yonna\Throwable\Exception;
@@ -46,56 +47,70 @@ class I18n
      * 最大 9 QTS
      * 暂可请求百度通用翻译API
      *
-     * @return bool
-     * @throws Exception\DatabaseException
+     * @throws null
      */
     private function auto()
     {
         if (!Config::getAuto()) {
-            trigger_error('Set Config for Auto Translate.');
-            return false;
+            Exception::params('Set Config for Auto Translate.');
         }
         if (!Config::getBaidu()) {
-            trigger_error('Set Config for BaiduApi.');
-            return false;
+            Exception::params('Set Config for BaiduApi.');
         }
         $rds = DB::redis(Config::getAuto());
         if (($rds instanceof Redis) === false) {
-            trigger_error('Auto Translate Should use Redis Database Driver.');
-            return false;
+            Exception::params('Auto Translate Should use Redis Database Driver.');
         }
+
+        $bdLimit = count(Config::getBaidu());
+
         $rk = $this->store . 'QTS';
-        if ((int)$rds->get($rk) >= 9) {
-            return true;
+        if ((int)$rds->get($rk) >= $bdLimit * 10) {
+            return;
         }
+        $one = null;
         $db = DB::connect($this->config);
         if ($db instanceof Mongo) {
             $one = $db->collection("{$this->store}")->one();
         } elseif ($db instanceof Mysql) {
-            $table = $db->table($this->store)->fetchQuery();
-            $one = $table->or(
-                function () use ($table) {
+            $one = $db->table($this->store)
+                ->or(function (Where $w) {
                     foreach (self::ALLOW_LANG as $v) {
-                        $table->equalTo($v, '');
+                        $w->equalTo($v, '');
                     }
-                    $table->and(
-                        function () use ($table) {
-                            foreach (self::ALLOW_LANG as $v) {
-                                $table->equalTo($v, '');
-                            }
-                        });
                 })
-                ->equalTo('zh_cn', 'x')
                 ->one();
-            var_dump($one);
-            exit();
         } elseif ($db instanceof Pgsql) {
             $one = $db->schemas('public')->table($this->store)->one();
         } else {
             Exception::database('Set Database for Support Driver.');
         }
-        // $rds->incr($rk);
-        return true;
+        if ($one) {
+            $bi = 0;
+            foreach (self::ALLOW_LANG as $v) {
+                if (!isset($one[$this->store . '_' . $v])) {
+                    continue;
+                }
+                if (empty($one[$this->store . '_' . $v])) {
+                    $bi++;
+                    if ($bi > 1/*$bdLimit * 3*/) {
+                        //baidu QTS
+                        break;
+                    }
+                    $rds->incr($rk);
+                    BaiduApi::translate(
+                        $one[$this->store . '_unique_key'],
+                        $v,
+                        function (string $from, string $to, string $res) use ($db, $rds, $rk) {
+                            $db->table($this->store)->equalTo('unique_key', $from)->update([
+                                $to => $res,
+                            ]);
+                            $rds->decr($rk);
+                        }
+                    );
+                }
+            }
+        }
     }
 
     /**
