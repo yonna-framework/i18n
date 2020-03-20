@@ -168,18 +168,27 @@ class I18n
      * @return bool
      * @throws Exception\DatabaseException
      */
-    public
-    function init()
+    public function init()
     {
-        $en_us = json_decode(file_get_contents(__DIR__ . '/lang/en_us.json'), true);
-        $zh_cn = json_decode(file_get_contents(__DIR__ . '/lang/zh_cn.json'), true);
+        $fileData = [];
+        foreach (self::ALLOW_LANG as $al) {
+            if (is_file(__DIR__ . "/lang/{$al}.json")) {
+                $fileData[$al] = json_decode(file_get_contents(__DIR__ . "/lang/{$al}.json"), true);
+            } else {
+                $fileData[$al] = [];
+            }
+        }
         $i18nData = [];
-        foreach ($en_us as $k => $v) {
+        foreach ($fileData['en_us'] as $k => $v) {
             $i18nData[] = [
                 "unique_key" => $k,
                 "source" => "default",
                 "en_us" => $v,
-                "zh_cn" => $zh_cn[$k] ?? '',
+                "zh_cn" => $fileData['zh_cn'][$k] ?? '',
+                'zh_hk' => $fileData['zh_hk'][$k] ?? '',
+                'zh_tw' => $fileData['zh_tw'][$k] ?? '',
+                'ja_jp' => $fileData['ja_jp'][$k] ?? '',
+                'ko_kr' => $fileData['ko_kr'][$k] ?? '',
             ];
         }
         $db = DB::connect($this->config);
@@ -220,13 +229,35 @@ class I18n
     }
 
     /**
-     * 获得i18n数据
-     * @return array
-     * @throws Exception
+     * 备份数据到json文件
      * @throws Exception\DatabaseException
      */
-    public
-    function get()
+    public function backup()
+    {
+        $data = $this->get();
+        $fileData = [];
+        foreach (self::ALLOW_LANG as $al) {
+            $fileData[$al] = [];
+        }
+        foreach ($data as $d) {
+            foreach (self::ALLOW_LANG as $al) {
+                $fileData[$al][$d[$this->store . '_unique_key']] = $d[$this->store . '_' . $al] ?? '';
+            }
+        }
+        foreach (self::ALLOW_LANG as $al) {
+            $fn = __DIR__ . "/lang/{$al}.json";
+            @file_put_contents($fn, json_encode($fileData[$al], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            @chmod($fn, 0644);
+        }
+        return true;
+    }
+
+    /**
+     * 获得i18n数据
+     * @return array
+     * @throws Exception\DatabaseException
+     */
+    public function get()
     {
         $res = [];
         $db = DB::connect($this->config);
@@ -250,8 +281,7 @@ class I18n
      * @param array $data
      * @throws Exception\DatabaseException
      */
-    public
-    function set($uniqueKey, $data = [])
+    public function set($uniqueKey, $data = [])
     {
         if (empty($uniqueKey)) {
             return;
