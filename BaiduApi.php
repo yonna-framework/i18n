@@ -4,9 +4,10 @@ namespace Yonna\I18n;
 
 use Closure;
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Pool;
 use GuzzleHttp\Psr7\Request;
 use Psr\Http\Message\ResponseInterface;
+use Throwable;
 use Yonna\Database\DB;
 use Yonna\Database\Driver\Redis;
 use Yonna\Foundation\Str;
@@ -57,6 +58,8 @@ class BaiduApi
         return self::$client;
     }
 
+    private static $confIndex = null;
+
     /**
      * 随机分配一个签名用于使用
      * @param string $query
@@ -64,11 +67,18 @@ class BaiduApi
      */
     private static function certificate(string $query): array
     {
-        $confCount = count(Config::getBaidu());
-        if ($confCount === 1) {
+        $confCount = count(Config::getBaidu()) - 1;
+        if ($confCount === 0) {
             $config = current(Config::getBaidu());
         } else {
-            $config = Config::getBaidu()[rand(0, count(Config::getBaidu()) - 1)]; // 随机取一个配置，分散使用
+            if (self::$confIndex === null) {
+                self::$confIndex = rand(0, $confCount);
+            } elseif (self::$confIndex >= $confCount) {
+                self::$confIndex = 0;
+            } else {
+                self::$confIndex += 1;
+            }
+            $config = Config::getBaidu()[self::$confIndex]; // 轮训地取一个配置，分散使用
         }
         $appid = $config[0];
         $salt = Str::randomNum(16);
@@ -82,72 +92,102 @@ class BaiduApi
 
     /**
      * 通用翻译API
-     * @param $query
-     * @param $from
-     * @param $to
+     * @param $translates
      * @param Closure $call
      * @throws Exception\DatabaseException
      * @throws Exception\ParamsException
      */
-    public static function translate($query, $from, $to, Closure $call)
+    public static function translate(array $translates, Closure $call)
     {
-        if (!$query || !$from || !$to) {
-            Exception::params('BaiduApi: query & from & to');
+        if (!$translates) {
+            Exception::params('BaiduApi: translates');
         }
         if (!Config::getBaidu()) {
             Exception::params('BaiduApi: Please set config');
         }
-        if (empty(self::LANG[$to])) {
-            Exception::params("BaiduApi: Un support lang <{$to}>");
-        }
-        $certificate = self::certificate($query);
         $rds = DB::redis(Config::getAuto());
         if (($rds instanceof Redis) === false) {
             Exception::params('Auto Translate Should use Redis Database Driver.');
             return;
         }
-        $rk = self::KEY . ":{$query}_" . self::LANG[$to];
-        $cache = $rds->get($rk);
-        if ($cache) {
-            $call($to, urldecode($cache['trans_result'][0]['dst']));
-            return;
+        $result = new Result();
+        $queryString = [];
+        foreach ($translates as $t) {
+            if (empty(self::LANG[$t['to']])) {
+                Log::file()->error([
+                    'msg' => "BaiduApi: Un support lang <{$t['to']}>"
+                ], self::KEY);
+                continue;
+            }
+            $certificate = self::certificate($t['q']);
+            $rk = self::KEY . ":{$t['q']}_" . self::LANG[$t['to']];
+            $cache = $rds->get($rk);
+            if ($cache) {
+                $result->push([
+                    'uk' => $t['uk'],
+                    'to' => $t['to'],
+                    'dst' => urldecode($cache['trans_result'][0]['dst']),
+                ]);
+            } else {
+                $queryString[] = [
+                    'uk' => $t['uk'],
+                    'rk' => $rk,
+                    'to' => $t['to'],
+                    'str' => http_build_query([
+                        'q' => urlencode($t['q']), // 请求翻译query UTF-8编码
+                        'from' => self::LANG[$t['from']] ?? $t['from'], // 翻译源语言 语言列表(可设置为auto)
+                        'to' => self::LANG[$t['to']],// 译文语言 语言列表(不可设置为auto)
+                        'appid' => $certificate['appid'],// APP ID 可在管理控制台查看
+                        'salt' => $certificate['salt'],// 随机数
+                        'sign' => $certificate['sign'],// 签名 appid+q+salt+密钥 的MD5值
+                    ])
+                ];;
+            }
         }
-        try {
-            $queryString = http_build_query([
-                'q' => urlencode($query), // 请求翻译query UTF-8编码
-                'from' => self::LANG[$from] ?? $from, // 翻译源语言 语言列表(可设置为auto)
-                'to' => self::LANG[$to],// 译文语言 语言列表(不可设置为auto)
-                'appid' => $certificate['appid'],// APP ID 可在管理控制台查看
-                'salt' => $certificate['salt'],// 随机数
-                'sign' => $certificate['sign'],// 签名 appid+q+salt+密钥 的MD5值
-            ]);
-            $request = new Request('GET', 'http://api.fanyi.baidu.com/api/trans/vip/translate?' . $queryString);
-            $promise = self::client()->sendAsync($request, ['timeout' => 5])->then(
-                function (ResponseInterface $response) use ($rds, $rk, $call, $query, $to) {
-                    if ($response->getStatusCode() === 200) {
-                        $res = $response->getBody()->__tostring();
-                        $res = json_decode($res, true);
-                        if (!empty($res['error_code'])) {
-                            Log::file()->error([
-                                'msg' => "{$res['error_msg']} " . self::ERRORS[$res['error_code']] ?? ''
-                            ], self::KEY);
-                        } else {
-                            $rds->set($rk, $res, 10);
-                            $call($to, urldecode($res['trans_result'][0]['dst']));
-                        }
-                    } else {
-                        Log::file()->error(['msg' => $response->getReasonPhrase()], self::KEY);
+        if ($queryString) {
+            try {
+                $requests = function () use ($queryString) {
+                    foreach ($queryString as $qs) {
+                        yield new Request(
+                            'GET',
+                            'http://api.fanyi.baidu.com/api/trans/vip/translate?' . $qs['str']
+                        );;
                     }
-                },
-                function (RequestException $e) {
-                    Log::file()->error([
-                        'msg' => '[' . $e->getRequest()->getMethod() . ']' . $e->getMessage()
-                    ], self::KEY);
-                }
-            );
-            // $promise->wait();
-        } catch (\Throwable $e) {
-            Log::file()->throwable($e, self::KEY);
+                };
+                $pool = new Pool(self::client(), $requests(), [
+                    // 'concurrency' => count($queryString), // 并发数量
+                    'options' => [
+                        'timeout' => 5,
+                    ],
+                    'fulfilled' => function (ResponseInterface $response, $index) use ($rds, $queryString, $result) {
+                        if ($response->getStatusCode() === 200) {
+                            $res = $response->getBody()->__tostring();
+                            $res = json_decode($res, true);
+                            if (!empty($res['error_code'])) {
+                                Log::file()->error([
+                                    'msg' => "{$res['error_msg']} " . self::ERRORS[$res['error_code']] ?? ''
+                                ], self::KEY);
+                            } else {
+                                $rds->set($queryString[$index]['rk'], $res, 18);
+                                $result->push([
+                                    'uk' => $queryString[$index]['uk'],
+                                    'to' => $queryString[$index]['to'],
+                                    'dst' => urldecode($res['trans_result'][0]['dst']),
+                                ]);
+                            }
+                        } else {
+                            Log::file()->error(['msg' => $response->getReasonPhrase()], self::KEY);
+                        }
+                    },
+                    'rejected' => function (Throwable $reason, $index) {
+                        Log::file()->throwable($reason, self::KEY);
+                    },
+                ]);
+                $pool->promise()->wait();
+                $call($result->get());
+            } catch (Throwable $e) {
+                Log::file()->throwable($e, self::KEY);
+            }
         }
     }
 

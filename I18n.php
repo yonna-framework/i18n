@@ -62,73 +62,104 @@ class I18n
             Exception::params('Auto Translate Should use Redis Database Driver.');
         }
 
-        $bdLimit = count(Config::getBaidu());
+        $bdLimit = count(Config::getBaidu()) * 5;
 
         $rk = $this->store . 'QTS';
-        if ((int)$rds->gcr($rk) >= $bdLimit * 15) {
-            $rds->expire($rk, 60);
+        if ((int)$rds->gcr($rk) >= $bdLimit) {
             return;
         }
-        $one = null;
+        $multi = null;
         $db = DB::connect($this->config);
         if ($db instanceof Mongo) {
-            $one = $db->collection("{$this->store}")->one();
+            $multi = $db->collection("{$this->store}")
+                ->limit(3)
+                ->multi();
         } elseif ($db instanceof Mysql) {
-            $one = $db->table($this->store)
+            $multi = $db->table($this->store)
                 ->or(function (Where $w) {
                     foreach (self::ALLOW_LANG as $v) {
                         $w->equalTo($v, '');
                     }
                 })
-                ->one();
+                ->limit(3)
+                ->multi();
         } elseif ($db instanceof Pgsql) {
-            $one = $db->schemas('public')->table($this->store)->one();
+            $multi = $db->schemas('public')->table($this->store)
+                ->or(function (Where $w) {
+                    foreach (self::ALLOW_LANG as $v) {
+                        $w->equalTo($v, '');
+                    }
+                })
+                ->limit(3)
+                ->multi();
         } else {
             Exception::database('Set Database for Support Driver.');
         }
-        if ($one) {
+        if ($multi) {
             $bi = 0;
-            foreach (self::ALLOW_LANG as $v) {
-                if (!isset($one[$this->store . '_' . $v])) {
-                    continue;
-                }
-                if (empty($one[$this->store . '_' . $v])) {
-                    $bi++;
-                    if ($bi > $bdLimit * 5) {
-                        break;
+            $translates = [];
+            foreach ($multi as $one) {
+                foreach (self::ALLOW_LANG as $v) {
+                    if (!isset($one[$this->store . '_' . $v])) {
+                        continue;
                     }
-                    $rds->incr($rk);
-                    $uk = $one[$this->store . '_unique_key'];
-                    $q = $uk;
-                    $from = 'auto';
-                    // 有英语用英语，无需怀疑
-                    if (!empty($one[$this->store . '_en_us'])) {
-                        $q = $one[$this->store . '_en_us'];
-                        $from = 'en_us';
-                    }
-                    // 同胞的文字，汉字优先
-                    if (!empty($one[$this->store . '_zh_cn']) && in_array($v, ['zh_hk', 'zh_tw'])) {
-                        $q = $one[$this->store . '_zh_cn'];
-                        $from = 'zh_cn';
-                    }
-                    try {
-                        BaiduApi::translate(
-                            $q,
-                            $from,
-                            $v,
-                            function (string $to, string $res) use ($db, $rds, $rk, $uk) {
-                                $db->table($this->store)->equalTo('unique_key', $uk)->update([
-                                    $to => $res,
-                                ]);
-                                $rds->decr($rk);
-                            }
-                        );
-                    } catch (\Throwable $e) {
-                        $rds->decr($rk);
-                        Exception::origin($e);
+                    if (empty($one[$this->store . '_' . $v])) {
+                        $bi++;
+                        if ($bi > $bdLimit) {
+                            break;
+                        }
+                        $uk = $one[$this->store . '_unique_key'];
+                        $q = $uk;
+                        $from = 'auto';
+                        // 有英语用英语，无需怀疑
+                        if (!empty($one[$this->store . '_en_us'])) {
+                            $q = $one[$this->store . '_en_us'];
+                            $from = 'en_us';
+                        }
+                        $translates[] = [
+                            'uk' => $uk,
+                            'q' => $q,
+                            'from' => $from,
+                            'to' => $v
+                        ];
                     }
                 }
             }
+            $rds->incr($rk, $bi);
+            if ($translates) {
+                try {
+                    BaiduApi::translate(
+                        $translates,
+                        function (array $res) use ($db) {
+                            $mixed = [];
+                            foreach ($res as $r) {
+                                if (empty($mixed[$r['uk']])) {
+                                    $mixed[$r['uk']] = [];
+                                }
+                                // 汉字圈去掉空格
+                                if (in_array($r['to'], [
+                                    'zh_cn', 'zh_hk', 'zh_tw',
+                                    'ja_jp', 'ko_kr',
+                                ])) {
+                                    $r['dst'] = str_replace(' ', '', $r['dst']);
+                                }
+                                $mixed[$r['uk']][$r['to']] = $r['dst'];
+                            }
+                            if ($mixed) {
+                                foreach ($mixed as $xk => $xv) {
+                                    $db->table($this->store)->equalTo('unique_key', $xk)->update($xv);
+                                }
+                            }
+                        }
+                    );
+                    $rds->decr($rk, $bi);
+                } catch
+                (\Throwable $e) {
+                    $rds->decr($rk, $bi);
+                    Exception::origin($e);
+                }
+            }
+            $rds->expire($rk, 30);
         }
     }
 
@@ -137,7 +168,8 @@ class I18n
      * @return bool
      * @throws Exception\DatabaseException
      */
-    public function init()
+    public
+    function init()
     {
         $en_us = json_decode(file_get_contents(__DIR__ . '/lang/en_us.json'), true);
         $zh_cn = json_decode(file_get_contents(__DIR__ . '/lang/zh_cn.json'), true);
@@ -193,7 +225,8 @@ class I18n
      * @throws Exception
      * @throws Exception\DatabaseException
      */
-    public function get()
+    public
+    function get()
     {
         $res = [];
         $db = DB::connect($this->config);
@@ -217,7 +250,8 @@ class I18n
      * @param array $data
      * @throws Exception\DatabaseException
      */
-    public function set($uniqueKey, $data = [])
+    public
+    function set($uniqueKey, $data = [])
     {
         if (empty($uniqueKey)) {
             return;
