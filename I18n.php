@@ -8,6 +8,7 @@ use Yonna\Database\Driver\Mysql;
 use Yonna\Database\Driver\Pdo\Where;
 use Yonna\Database\Driver\Pgsql;
 use Yonna\Database\Driver\Redis;
+use Yonna\Log\Log;
 use Yonna\Throwable\Exception;
 
 class I18n
@@ -299,11 +300,15 @@ class I18n
             }
         } elseif ($db instanceof Mysql) {
             $res = $db->table($this->store)->equalTo('unique_key', $uniqueKey)->one();
-            if (!$res) {
-                $data['unique_key'] = $uniqueKey;
-                $db->table($this->store)->insert($data);
-            } else {
-                $db->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
+            try {
+                if (!$res) {
+                    $data['unique_key'] = $uniqueKey;
+                    $db->table($this->store)->insert($data);
+                } else {
+                    $db->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
+                }
+            } catch (Exception\DatabaseException $e) {
+                Log::file()->throwable($e, 'I18N');
             }
         } elseif ($db instanceof Pgsql) {
             $res = $db->schemas('public')->table($this->store)->one();
