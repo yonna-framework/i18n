@@ -45,7 +45,7 @@ class I18n
 
     /**
      * 自动翻译机
-     * 最大 9 QTS
+     * 个人单号最大 9 QTS
      * 暂可请求百度通用翻译API
      *
      * @throws null
@@ -53,10 +53,10 @@ class I18n
     private function auto()
     {
         if (!Config::getAuto()) {
-            Exception::params('Set Config for Auto Translate.');
+            return;
         }
         if (!Config::getBaidu()) {
-            Exception::params('Set Config for BaiduApi.');
+            return;
         }
         $rds = DB::redis(Config::getAuto());
         if (($rds instanceof Redis) === false) {
