@@ -5,7 +5,8 @@ namespace Yonna\I18n;
 use Yonna\Database\DB;
 use Yonna\Database\Driver\Mongo;
 use Yonna\Database\Driver\Mysql;
-use Yonna\Database\Driver\Pdo\Where;
+use Yonna\Database\Driver\Pdo\Where as Pw;
+use Yonna\Database\Driver\Mdo\Where as Mw;
 use Yonna\Database\Driver\Pgsql;
 use Yonna\Database\Driver\Redis;
 use Yonna\Log\Log;
@@ -73,11 +74,16 @@ class I18n
         $db = DB::connect($this->config);
         if ($db instanceof Mongo) {
             $multi = $db->collection("{$this->store}")
+                ->or(function (Mw $w) {
+                    foreach (self::ALLOW_LANG as $v) {
+                        $w->equalTo($v, '');
+                    }
+                })
                 ->limit(3)
                 ->multi();
         } elseif ($db instanceof Mysql) {
             $multi = $db->table($this->store)
-                ->or(function (Where $w) {
+                ->or(function (Pw $w) {
                     foreach (self::ALLOW_LANG as $v) {
                         $w->equalTo($v, '');
                     }
@@ -86,7 +92,7 @@ class I18n
                 ->multi();
         } elseif ($db instanceof Pgsql) {
             $multi = $db->schemas('public')->table($this->store)
-                ->or(function (Where $w) {
+                ->or(function (Pw $w) {
                     foreach (self::ALLOW_LANG as $v) {
                         $w->equalTo($v, '');
                     }
@@ -99,6 +105,7 @@ class I18n
         if ($multi) {
             $bi = 0;
             $translates = [];
+            $mongoRecord = [];
             foreach ($multi as $one) {
                 foreach (self::ALLOW_LANG as $v) {
                     if (!isset($one[$this->store . '_' . $v])) {
@@ -123,6 +130,7 @@ class I18n
                             'from' => $from,
                             'to' => $v
                         ];
+                        $mongoRecord[$uk] = $one;
                     }
                 }
             }
@@ -131,7 +139,7 @@ class I18n
                 try {
                     BaiduApi::translate(
                         $translates,
-                        function (array $res) use ($db) {
+                        function (array $res) use ($db, $mongoRecord) {
                             $mixed = [];
                             foreach ($res as $r) {
                                 if (empty($mixed[$r['uk']])) {
@@ -148,14 +156,25 @@ class I18n
                             }
                             if ($mixed) {
                                 foreach ($mixed as $xk => $xv) {
-                                    $db->table($this->store)->equalTo('unique_key', $xk)->update($xv);
+                                    if ($db instanceof Mongo) {
+                                        foreach ($mongoRecord[$xk] as $mrk => $mr) {
+                                            $mrk = str_replace($this->store . '_', '', $mrk);
+                                            if ($mrk != '_id' && empty($xv[$mrk])) {
+                                                $xv[$mrk] = $mr;
+                                            }
+                                        }
+                                        $db->collection($this->store)->equalTo('unique_key', $xk)->update($xv);
+                                    } elseif ($db instanceof Mysql) {
+                                        $db->table($this->store)->equalTo('unique_key', $xk)->update($xv);
+                                    } elseif ($db instanceof Pgsql) {
+                                        $db->schemas('public')->table($this->store)->equalTo('unique_key', $xk)->update($xv);
+                                    }
                                 }
                             }
                         }
                     );
                     $rds->decr($rk, $bi);
-                } catch
-                (\Throwable $e) {
+                } catch (\Throwable $e) {
                     $rds->decr($rk, $bi);
                     Exception::origin($e);
                 }
@@ -299,8 +318,8 @@ class I18n
                     $db->collection("{$this->store}")->insert($data);
                 } else {
                     unset($res['_id']);
-                    unset($res['unique_key']);
                     foreach ($res as $rk => $r) {
+                        $rk = str_replace($this->store . '_', '', $rk);
                         if (!isset($data[$rk])) {
                             $data[$rk] = $r;
                         }
