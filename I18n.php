@@ -194,6 +194,7 @@ class I18n
         }
         $db = DB::connect($this->config);
         if ($db instanceof Mongo) {
+            $db->collection("{$this->store}")->drop(true);
             $db->collection("{$this->store}")->insertAll($i18nData);
         } elseif ($db instanceof Mysql) {
             $db->query("CREATE TABLE IF NOT EXISTS `{$this->store}`(
@@ -290,36 +291,43 @@ class I18n
         $uniqueKey = strtoupper($uniqueKey);
         $data = array_filter($data);
         $db = DB::connect($this->config);
-        if ($db instanceof Mongo) {
-            $res = $db->collection("{$this->store}")->getCollection();
-            if (!$res) {
-                $data['unique_key'] = $uniqueKey;
-                $db->collection("{$this->store}")->insert($data);
-            } else {
-                $db->collection("{$this->store}")->equalTo('unique_key', $uniqueKey)->update($data);
-            }
-        } elseif ($db instanceof Mysql) {
-            $res = $db->table($this->store)->equalTo('unique_key', $uniqueKey)->one();
-            try {
+        try {
+            if ($db instanceof Mongo) {
+                $res = $db->collection("{$this->store}")->equalTo('unique_key', $uniqueKey)->one();
+                if (!$res) {
+                    $data['unique_key'] = $uniqueKey;
+                    $db->collection("{$this->store}")->insert($data);
+                } else {
+                    unset($res['_id']);
+                    unset($res['unique_key']);
+                    foreach ($res as $rk => $r) {
+                        if (!isset($data[$rk])) {
+                            $data[$rk] = $r;
+                        }
+                    }
+                    $db->collection("{$this->store}")->equalTo('unique_key', $uniqueKey)->update($data);
+                }
+            } elseif ($db instanceof Mysql) {
+                $res = $db->table($this->store)->equalTo('unique_key', $uniqueKey)->one();
                 if (!$res) {
                     $data['unique_key'] = $uniqueKey;
                     $db->table($this->store)->insert($data);
                 } else {
                     $db->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
                 }
-            } catch (Exception\DatabaseException $e) {
-                Log::file()->throwable($e, 'I18N');
-            }
-        } elseif ($db instanceof Pgsql) {
-            $res = $db->schemas('public')->table($this->store)->one();
-            if (!$res) {
-                $data['unique_key'] = $uniqueKey;
-                $db->schemas('public')->table($this->store)->insert($data);
+            } elseif ($db instanceof Pgsql) {
+                $res = $db->schemas('public')->table($this->store)->one();
+                if (!$res) {
+                    $data['unique_key'] = $uniqueKey;
+                    $db->schemas('public')->table($this->store)->insert($data);
+                } else {
+                    $db->schemas('public')->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
+                }
             } else {
-                $db->schemas('public')->table($this->store)->equalTo('unique_key', $uniqueKey)->update($data);
+                Exception::database('Set Database for Support Driver.');
             }
-        } else {
-            Exception::database('Set Database for Support Driver.');
+        } catch (Exception\DatabaseException $e) {
+            Log::file()->throwable($e, 'I18N');
         }
         $this->auto();
     }
