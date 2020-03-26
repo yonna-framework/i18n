@@ -2,6 +2,7 @@
 
 namespace Yonna\I18n;
 
+use Throwable;
 use Yonna\Database\DB;
 use Yonna\Database\Driver\Mongo;
 use Yonna\Database\Driver\Mysql;
@@ -174,7 +175,7 @@ class I18n
                         }
                     );
                     $rds->decr($rk, $bi);
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $rds->decr($rk, $bi);
                     Exception::origin($e);
                 }
@@ -332,7 +333,6 @@ class I18n
      * 如果有则更新，没有则添加
      * @param $uniqueKey
      * @param array $data
-     * @throws Exception\DatabaseException
      */
     public function set($uniqueKey, $data = [])
     {
