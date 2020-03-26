@@ -296,6 +296,38 @@ class I18n
     }
 
     /**
+     * 分页获得数据
+     * @param int $current
+     * @param int $per
+     * @param array $filter
+     * @return array
+     * @throws Exception\DatabaseException
+     */
+    public function page($current = 0, $per = 50, $filter = [])
+    {
+        $res = [];
+        $db = DB::connect($this->config);
+        if ($db instanceof Mongo) {
+            $obj = $db->collection("{$this->store}");
+        } elseif ($db instanceof Mysql) {
+            $obj = $db->table($this->store);
+        } elseif ($db instanceof Pgsql) {
+            $obj = $db->schemas('public')->table($this->store);
+        } else {
+            Exception::database('Set Database for Support Driver.');
+            return $res;
+        }
+        if (!empty($filter['unique_key'])) {
+            $obj = $obj->equalTo('unique_key', $filter['unique_key']);
+        }
+        if (!empty($filter['source'])) {
+            $obj = $obj->equalTo('source', $filter['source']);
+        }
+        $res = $obj->page($current, $per);
+        return $res;
+    }
+
+    /**
      * 设置一个i18n数据
      * 如果有则更新，没有则添加
      * @param $uniqueKey
