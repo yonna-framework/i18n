@@ -268,6 +268,7 @@ class I18n
         }
         foreach (self::ALLOW_LANG as $al) {
             $fn = __DIR__ . "/lang/{$al}.json";
+            ksort($fileData[$al]);
             @file_put_contents($fn, json_encode($fileData[$al], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
             @chmod($fn, 0644);
         }
