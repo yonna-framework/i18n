@@ -305,7 +305,7 @@ class I18n
      * @return array
      * @throws Exception\DatabaseException
      */
-    public function page($current = 0, $per = 50, $filter = [])
+    public function page($current = 1, $per = 10, $filter = [])
     {
         $res = [];
         $db = DB::connect($this->config);
