@@ -38,6 +38,15 @@ class Scope
                     Config::delete('init', function () {
                         return (new I18n())->init();
                     });
+                    Config::delete('set', function (Request $request) {
+                        $input = $request->getInput();
+                        $data = [];
+                        foreach (I18n::ALLOW_LANG as $lang) {
+                            $data[$lang] = $input[$lang] ?? '';
+                        }
+                        (new I18n())->set($input['unique_key'], $data);
+                        return true;
+                    });
                 });
             }
         );

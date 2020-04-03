@@ -357,6 +357,11 @@ class I18n
                             $data[$rk] = $r;
                         }
                     }
+                    foreach (I18n::ALLOW_LANG as $l) {
+                        if (!isset($data[$l])) {
+                            $data[$l] = '';
+                        }
+                    }
                     $db->collection("{$this->store}")->equalTo('unique_key', $uniqueKey)->update($data);
                 }
             } elseif ($db instanceof Mysql) {
