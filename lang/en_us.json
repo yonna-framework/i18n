@@ -50,6 +50,7 @@
     "FILL_INT": "Int",
     "FILL_NUM": "Num",
     "FILTER_ERROR": "Filter is break",
+    "FORGOT_PASSWORD": "forgot_password",
     "FRESH": "Fresh",
     "GUIDE_BOOK": "Guide Book",
     "GUIDE_TPL": "Guide Tpl",
