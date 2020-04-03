@@ -78,6 +78,7 @@ class I18n
                 ->or(function (Mw $w) {
                     foreach (self::ALLOW_LANG as $v) {
                         $w->equalTo($v, '');
+                        $w->isNull($v);
                     }
                 })
                 ->limit(3)
@@ -109,9 +110,6 @@ class I18n
             $mongoRecord = [];
             foreach ($multi as $one) {
                 foreach (self::ALLOW_LANG as $v) {
-                    if (!isset($one[$this->store . '_' . $v])) {
-                        continue;
-                    }
                     if (empty($one[$this->store . '_' . $v])) {
                         $bi++;
                         if ($bi > $bdLimit) {
@@ -351,6 +349,11 @@ class I18n
                 $res = $db->collection("{$this->store}")->equalTo('unique_key', $uniqueKey)->one();
                 if (!$res) {
                     $data['unique_key'] = $uniqueKey;
+                    foreach (I18n::ALLOW_LANG as $l) {
+                        if (!isset($data[$l])) {
+                            $data[$l] = '';
+                        }
+                    }
                     $db->collection("{$this->store}")->insert($data);
                 } else {
                     unset($res['_id']);
@@ -358,11 +361,6 @@ class I18n
                         $rk = str_replace($this->store . '_', '', $rk);
                         if (!isset($data[$rk])) {
                             $data[$rk] = $r;
-                        }
-                    }
-                    foreach (I18n::ALLOW_LANG as $l) {
-                        if (!isset($data[$l])) {
-                            $data[$l] = '';
                         }
                     }
                     $db->collection("{$this->store}")->equalTo('unique_key', $uniqueKey)->update($data);
