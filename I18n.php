@@ -153,6 +153,9 @@ class I18n
                                 ])) {
                                     $r['dst'] = str_replace(' ', '', $r['dst']);
                                 }
+                                if ($r['to'] === 'en_us') {
+                                    $r['dst'] = strtolower($r['dst']);
+                                }
                                 $mixed[$r['uk']][$r['to']] = $r['dst'];
                             }
                             if ($mixed) {
