@@ -78,6 +78,10 @@ class I18n
                 ->or(function (Mw $w) {
                     foreach (self::ALLOW_LANG as $v) {
                         $w->equalTo($v, '');
+                    }
+                })
+                ->or(function (Mw $w) {
+                    foreach (self::ALLOW_LANG as $v) {
                         $w->isNull($v);
                     }
                 })
@@ -286,11 +290,11 @@ class I18n
         $res = [];
         $db = DB::connect($this->config);
         if ($db instanceof Mongo) {
-            $res = $db->collection("{$this->store}")->multi();
+            $res = $db->collection("{$this->store}")->orderBy('unique_key', 'asc')->multi();
         } elseif ($db instanceof Mysql) {
-            $res = $db->table($this->store)->multi();
+            $res = $db->table($this->store)->orderBy('unique_key', 'asc')->multi();
         } elseif ($db instanceof Pgsql) {
-            $res = $db->schemas('public')->table($this->store)->multi();
+            $res = $db->schemas('public')->table($this->store)->orderBy('unique_key', 'asc')->multi();
         } else {
             Exception::database('Set Database for Support Driver.');
         }
@@ -311,11 +315,11 @@ class I18n
         $res = [];
         $db = DB::connect($this->config);
         if ($db instanceof Mongo) {
-            $obj = $db->collection("{$this->store}");
+            $obj = $db->collection("{$this->store}")->orderBy('unique_key', 'asc');
         } elseif ($db instanceof Mysql) {
-            $obj = $db->table($this->store);
+            $obj = $db->table($this->store)->orderBy('unique_key', 'asc');
         } elseif ($db instanceof Pgsql) {
-            $obj = $db->schemas('public')->table($this->store);
+            $obj = $db->schemas('public')->table($this->store)->orderBy('unique_key', 'asc');
         } else {
             Exception::database('Set Database for Support Driver.');
             return $res;
