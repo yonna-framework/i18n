@@ -44,6 +44,7 @@ class Scope
                         foreach (I18n::ALLOW_LANG as $lang) {
                             $data[$lang] = $input[$lang] ?? '';
                         }
+                        $input['source'] && $data['source'] = $input['source'];
                         (new I18n())->set($input['unique_key'], $data);
                         return true;
                     });
