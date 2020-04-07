@@ -1,6 +1,7 @@
 {
     "ACCESSING": "방문중...",
     "ACCOUNT": "계정",
+    "ACTION": "행동",
     "ADD": "첨가하다.",
     "API_ERROR": "API오류",
     "API_ERROR_ABORT": "문의에러",
@@ -19,6 +20,7 @@
     "BACKUP": "백업",
     "BIG_PICTURE": "큰그림",
     "CANCEL": "취소하다.",
+    "CHANGING": "달라지다",
     "CHOOSE_ALL": "선택모두",
     "CHOOSE_DISPLAY_COL": "열선택",
     "CONFIRM_OPERATION": "%3F확인중",

@@ -1,6 +1,7 @@
 {
-    "ACCESSING": "ACCESSING...",
+    "ACCESSING": "ACCESSING..",
     "ACCOUNT": "Account",
+    "ACTION": "action",
     "ADD": "Add",
     "API_ERROR": "API error",
     "API_ERROR_ABORT": "Query has error",
@@ -19,6 +20,7 @@
     "BACKUP": "Backup",
     "BIG_PICTURE": "Big picture",
     "CANCEL": "Cancel",
+    "CHANGING": "changing",
     "CHOOSE_ALL": "Choose all",
     "CHOOSE_DISPLAY_COL": "Choose Col",
     "CONFIRM_OPERATION": "Are you sure?",

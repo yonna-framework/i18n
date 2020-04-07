@@ -1,6 +1,7 @@
 {
     "ACCESSING": "アクセス.",
     "ACCOUNT": "アカウント",
+    "ACTION": "アクション",
     "ADD": "追加",
     "API_ERROR": "APIエラー",
     "API_ERROR_ABORT": "クエリエラー",
@@ -19,6 +20,7 @@
     "BACKUP": "バックアップ",
     "BIG_PICTURE": "ビッグピクチャー",
     "CANCEL": "取り消し",
+    "CHANGING": "変化",
     "CHOOSE_ALL": "すべてを選択",
     "CHOOSE_DISPLAY_COL": "を選択",
     "CONFIRM_OPERATION": "あなたは確か%",
