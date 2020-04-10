@@ -6,7 +6,7 @@
     "API_ERROR": "API錯誤",
     "API_ERROR_ABORT": "査詢有錯誤",
     "API_ERROR_DEFAULT": "連接失敗",
-    "API_ERROR_NET": "淨誤差",
+    "API_ERROR_NET": "網絡錯誤",
     "API_ERROR_NET_TIMEOUT": "網絡超時",
     "API_ERROR_NOT_AUTH": "不再驗證,login",
     "API_ERROR_NOT_SERVICE": "不服務",
