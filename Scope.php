@@ -44,7 +44,6 @@ class Scope
                         foreach (I18n::ALLOW_LANG as $lang) {
                             $data[$lang] = $input[$lang] ?? '';
                         }
-                        $input['source'] && $data['source'] = $input['source'];
                         (new I18n())->set($input['unique_key'], $data);
                         return true;
                     });
@@ -65,7 +64,6 @@ class Scope
                     $input['per'] ?? 10,
                     [
                         'unique_key' => $input['unique_key'] ?? null,
-                        'source' => $input['source'] ?? null
                     ],
                     );
             });

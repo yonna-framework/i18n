@@ -67,7 +67,7 @@ class I18n
 
         $bdLimit = count(Config::getBaidu()) * 5;
 
-        $rk = $this->store . 'QTS';
+        $rk = $this->store . 'qts';
         if ((int)$rds->gcr($rk) >= $bdLimit) {
             return;
         }
@@ -208,7 +208,6 @@ class I18n
         foreach ($fileData['en_us'] as $k => $v) {
             $i18nData[] = [
                 "unique_key" => $k,
-                "source" => "default",
                 "en_us" => $v,
                 "zh_cn" => $fileData['zh_cn'][$k] ?? '',
                 'zh_hk' => $fileData['zh_hk'][$k] ?? '',
@@ -224,7 +223,6 @@ class I18n
         } elseif ($db instanceof Mysql) {
             $db->query("CREATE TABLE IF NOT EXISTS `{$this->store}`(
                         `unique_key` char(255) NOT NULL DEFAULT '' COMMENT '验证key',
-                        `source`     char(255) NOT NULL DEFAULT 'new' COMMENT '来源',
                         `zh_cn`      char(255) NOT NULL DEFAULT '' COMMENT '简体中文',
                         `zh_hk`      char(255) NOT NULL DEFAULT '' COMMENT '香港繁体',
                         `zh_tw`      char(255) NOT NULL DEFAULT '' COMMENT '台湾繁体',
@@ -238,7 +236,6 @@ class I18n
         } elseif ($db instanceof Pgsql) {
             $db->query("CREATE TABLE IF NOT EXISTS `{$this->store}`(
                         `unique_key` text NOT NULL DEFAULT '',
-                        `source`     text NOT NULL DEFAULT 'new',
                         `zh_cn`      text NOT NULL DEFAULT '',
                         `zh_hk`      text NOT NULL DEFAULT '',
                         `zh_tw`      text NOT NULL DEFAULT '',
@@ -326,9 +323,6 @@ class I18n
         }
         if (!empty($filter['unique_key'])) {
             $obj = $obj->equalTo('unique_key', $filter['unique_key']);
-        }
-        if (!empty($filter['source'])) {
-            $obj = $obj->equalTo('source', $filter['source']);
         }
         $res = $obj->page($current, $per);
         return $res;
