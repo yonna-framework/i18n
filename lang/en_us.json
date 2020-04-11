@@ -139,6 +139,7 @@
     "TRIGGER": "Trigger",
     "UNIQUE_KEY": "UNIQUE_KEY",
     "UN_KNOW": "UnKnow",
+    "UN_LOGIN": "un_login",
     "UPLOAD": "Upload",
     "UPLOAD_ONLY_ALLOW": "Only support",
     "URL_FORMAT": "URLFormat http(s):\/\/xxx.xx",

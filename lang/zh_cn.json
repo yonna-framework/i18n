@@ -139,6 +139,7 @@
     "TRIGGER": "触发",
     "UNIQUE_KEY": "唯一密钥",
     "UN_KNOW": "未知",
+    "UN_LOGIN": "取消登录",
     "UPLOAD": "上传",
     "UPLOAD_ONLY_ALLOW": "最多只能上传",
     "URL_FORMAT": "网址格式 http(s):\/\/xxx.xx",
