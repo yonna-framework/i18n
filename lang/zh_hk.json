@@ -17,6 +17,7 @@
     "API_ERROR_SERVICE_DISABLE": "服務不可用",
     "API_ERROR_TIMEOUT": "請求超時",
     "API_TYPE_ERROR": "API類型錯誤",
+    "ARGUMENT 1 PASSED TO YONNA\\IO\\REQUESTBUILDER::SETINPUT() MUST BE OF THE TYPE ARRAY, NULL GIVEN, CALLED IN \/VAR\/WWW\/GOGS\/SHANSHAN\/FIANE\/API-END\/VENDOR\/YONNA\/CORE\/IO\/CRYPTO.PHP ON LINE 68": "你知道，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會，你會",
     "BACKUP": "備份",
     "BIG_PICTURE": "大圖片",
     "BLACK": "黑色",

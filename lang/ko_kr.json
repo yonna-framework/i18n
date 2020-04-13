@@ -17,6 +17,7 @@
     "API_ERROR_SERVICE_DISABLE": "서비스사용불가",
     "API_ERROR_TIMEOUT": "요청시간초과",
     "API_TYPE_ERROR": "API형식오류",
+    "ARGUMENT 1 PASSED TO YONNA\\IO\\REQUESTBUILDER::SETINPUT() MUST BE OF THE TYPE ARRAY, NULL GIVEN, CALLED IN \/VAR\/WWW\/GOGS\/SHANSHAN\/FIANE\/API-END\/VENDOR\/YONNA\/CORE\/IO\/CRYPTO.PHP ON LINE 68": "%2Cyour%27d%2Cyour%27d%2Cyour%27d%2Cyour%27d%2cyononononononacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacaca",
     "BACKUP": "백업",
     "BIG_PICTURE": "큰그림",
     "BLACK": "검은색",
