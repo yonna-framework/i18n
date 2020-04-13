@@ -65,7 +65,7 @@ class I18n
             Exception::params('Auto Translate Should use Redis Database Driver.');
         }
 
-        $bdLimit = count(Config::getBaidu()) * 5;
+        $bdLimit = count(Config::getBaidu()) * 4;
 
         $rk = $this->store . 'qts';
         if ((int)$rds->gcr($rk) >= $bdLimit) {
@@ -85,7 +85,7 @@ class I18n
                         $w->isNull($v);
                     }
                 })
-                ->limit(3)
+                ->limit(2)
                 ->multi();
         } elseif ($db instanceof Mysql) {
             $multi = $db->table($this->store)
@@ -94,7 +94,7 @@ class I18n
                         $w->equalTo($v, '');
                     }
                 })
-                ->limit(3)
+                ->limit(2)
                 ->multi();
         } elseif ($db instanceof Pgsql) {
             $multi = $db->schemas('public')->table($this->store)
@@ -103,7 +103,7 @@ class I18n
                         $w->equalTo($v, '');
                     }
                 })
-                ->limit(3)
+                ->limit(2)
                 ->multi();
         } else {
             Exception::database('Set Database for Support Driver.');
