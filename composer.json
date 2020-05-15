@@ -23,9 +23,9 @@
   "name": "yonna/i18n",
   "require": {
     "guzzlehttp/guzzle": "^6.5",
-    "yonna/database": "@dev",
-    "yonna/foundation": "@dev",
-    "yonna/log": "@dev"
+    "yonna/database": "^1.0",
+    "yonna/foundation": "^1.0",
+    "yonna/log": "^1.0"
   },
   "type": "library"
 }
