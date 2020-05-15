@@ -22,10 +22,10 @@
   "license": "MIT",
   "name": "yonna/i18n",
   "require": {
-    "guzzlehttp/guzzle": "^6.5",
-    "yonna/database": "^1.0",
-    "yonna/foundation": "^1.0",
-    "yonna/log": "^1.0"
+    "guzzlehttp/guzzle": "~6.5",
+    "yonna/database": "~1.0",
+    "yonna/foundation": "~1.0",
+    "yonna/log": "~1.0"
   },
   "type": "library"
 }
